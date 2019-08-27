@@ -1,0 +1,18 @@
+[package]
+name = "tlc59xxx"
+version = "0.1.0"
+authors = ["Kyle Charters <kylewcharters@gmail.com>"]
+edition = "2018"
+
+repository = "https://github.com/KyleCharters/tlc59xxx"
+license = "MIT"
+description = "Embedded-hal implementation for the TLC5947 & TLC59711"
+
+[dependencies]
+bitvec = "0.15.1"
+embedded-hal = "0.2.3"
+typenum = "1.11.2"
+
+[dev-dependencies]
+embedded-hal-mock = "0.7.0"
+rand = "0.7.0"
