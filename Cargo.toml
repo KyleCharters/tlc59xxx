@@ -8,7 +8,7 @@ repository = "https://github.com/KyleCharters/tlc59xxx"
 license = "MIT"
 description = "Embedded-hal implementation for the TLC5947 & TLC59711"
 categories = ["embedded", "hardware-support"]
-keywords = ["tlc5947", "tlc59711", "spi", "embedded-hal-driver", "embedded-hal", "hal"]
+keywords = ["tlc5947", "tlc59711", "spi", "embedded-hal", "hal"]
 
 [dependencies]
 bitvec = "0.15.1"
