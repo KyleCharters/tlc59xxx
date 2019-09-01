@@ -17,16 +17,30 @@ pub struct TLC59xxx<SPI, LAT, WORD, CHANNELS> {
 pub type TLC5947<SPI, LAT> = TLC59xxx<SPI, LAT, U12, U24>;
 
 impl<SPI: Write<u8>, LAT: OutputPin> TLC5947<SPI, LAT> {
-    pub fn new_tlc5947(spi: SPI, lat: LAT, chain_size: usize) -> TLC5947<SPI, LAT> {
-        Self::new(spi, lat, chain_size)
+    /// Returns TLC59xxx driver with 24 channels & 12-bit words
+    ///
+    /// # Arguments
+    ///
+    /// * `spi` The embedded-hal spi device
+    /// * `lat` An embedded-hal pin device, this is toggled once data has finished being written to the register
+    /// * `chain_size` The amount of devices chained together
+    pub fn new(spi: SPI, lat: LAT, chain_size: usize) -> TLC5947<SPI, LAT> {
+        Self::new_device(spi, lat, chain_size)
     }
 }
 
 pub type TLC59711<SPI, LAT> = TLC59xxx<SPI, LAT, U16, U12>;
 
 impl<SPI: Write<u8>, LAT: OutputPin> TLC59711<SPI, LAT> {
-    pub fn new_tlc59711(spi: SPI, lat: LAT, chain_size: usize) -> TLC59711<SPI, LAT> {
-        Self::new(spi, lat, chain_size)
+    /// Returns TLC59xxx driver with 12 channels & 16-bit words
+    ///
+    /// # Arguments
+    ///
+    /// * `spi` The embedded-hal spi device
+    /// * `lat` An embedded-hal pin device, this is toggled once data has finished being written to the register
+    /// * `chain_size` The amount of devices chained together
+    pub fn new(spi: SPI, lat: LAT, chain_size: usize) -> TLC59711<SPI, LAT> {
+        Self::new_device(spi, lat, chain_size)
     }
 }
 
@@ -37,7 +51,7 @@ where
     WORD: Unsigned,
     CHANNELS: Unsigned,
 {
-    pub fn new(spi: SPI, lat: LAT, chain_size: usize) -> TLC59xxx<SPI, LAT, WORD, CHANNELS> {
+    fn new_device(spi: SPI, lat: LAT, chain_size: usize) -> TLC59xxx<SPI, LAT, WORD, CHANNELS> {
         TLC59xxx {
             spi,
             lat,
@@ -46,20 +60,50 @@ where
         }
     }
 
-    pub fn set_pwm(&mut self, channel: usize, pwm: u16) {
-        assert!((pwm as usize) < 2usize.pow(WORD::to_u32()));
+    /// Sets a channel to a given frequency
+    ///
+    /// # Arguments
+    ///
+    /// * `channel` The channel to change. This must be no greater than the total amount of channels in all chained devices
+    /// * `val` The frequency to set the channel to. This must be no greater than what can be contained in the word size
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Embedded-hal device setup
+    /// let tlc = TLC5947::new(spi, lat, 2);
+    /// tlc.set_pwm(2, 4096); //Set to max for the tlc5947
+    /// tlc.set_pwm(32, 512); //Set on second chained device
+    /// tlc.write();
+    /// ```
+    pub fn set_pwm(&mut self, channel: usize, val: u16) {
+        assert!((val as usize) < 2usize.pow(WORD::to_u32()));
         assert!(channel < (self.shift_register.len() / WORD::to_usize()));
-        
+
         let end = self.shift_register.len() - channel * WORD::to_usize();
         let start = end - WORD::to_usize();
-        let mut slice = pwm.as_bitslice::<LittleEndian>()[..WORD::to_usize()].iter();
+        let mut new_val = val.as_bitslice::<LittleEndian>()[..WORD::to_usize()].iter();
 
         for x in start..end {
-            self.shift_register.set(x, slice.next().unwrap());
+            self.shift_register.set(x, new_val.next().unwrap());
         }
-
     }
 
+    /// Helper function for rgb leds, sets 3 ajacent channels using set_pwm
+    ///
+    /// # Arguments
+    ///
+    /// * `light` The channel offset by multiple of 3
+    /// * `val` A triplet of channel frequencies
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Embedded-hal device setup
+    /// let tlc = TLC5947::new(spi, lat, 1);
+    /// tlc.set_rgb(2, (4096, 128, 2048)); //This changes channels 6, 7, 8
+    /// tlc.write();
+    /// ```
     pub fn set_rgb(&mut self, light: usize, rgb: (u16, u16, u16)) {
         let light = light * 3;
         self.set_pwm(light, rgb.0);
@@ -67,14 +111,18 @@ where
         self.set_pwm(light + 2, rgb.2);
     }
 
+    /// Writes current register to the device
     pub fn write(&mut self) -> Result<()> {
-        self.spi.write(dbg!(&self.shift_register.as_slice())).map_err(|_| Error::Spi)?;
+        self.spi
+            .write(&self.shift_register.as_slice())
+            .map_err(|_| Error::Spi)?;
 
         self.lat.set_high().map_err(|_| Error::Lat)?;
         self.lat.set_low().map_err(|_| Error::Lat)?;
         Ok(())
     }
 
+    /// Destroys the device, returning embedded-hal components
     pub fn destroy(self) -> (SPI, LAT) {
         (self.spi, self.lat)
     }
@@ -189,7 +237,7 @@ mod tests {
 
         let spi = SpiMock::new(&spi_expectation);
         let pin = PinMock::new(&pin_expectation);
-        let mut tlc = TLC59xxx::new_tlc5947(spi, pin, 1);
+        let mut tlc = TLC5947::new(spi, pin, 1);
 
         tlc.set_pwm(1, 0b1_0000_0000_0000);
     }
