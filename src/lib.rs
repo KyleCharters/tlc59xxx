@@ -89,7 +89,7 @@ where
         }
     }
 
-    /// Helper function for rgb leds, sets 3 ajacent channels using set_pwm
+    /// Helper function for rgb leds, sets 3 adjacent channels using set_pwm
     ///
     /// # Arguments
     ///
